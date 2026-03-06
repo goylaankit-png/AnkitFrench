@@ -171,6 +171,24 @@ const DEFAULT_WORDS = [
   { id: 243, french: "elle-même", english: "herself", example_fr: "Elle l'a fait elle-même.", example_en: "She did it herself.", category: "Grammar", icon: "👩", learned: false },
   { id: 244, french: "lui-même", english: "himself", example_fr: "Il l'a réparé lui-même.", example_en: "He repaired it himself.", category: "Grammar", icon: "👨", learned: false },
   { id: 245, french: "la gaffe", english: "mistake / blunder", example_fr: "J'ai fait une gaffe.", example_en: "I made a blunder.", category: "Nouns", icon: "😬", learned: false },
+
+  // --- Professions (masculine/feminine pairs) ---
+  { id: 301, french: "l'enseignant / l'enseignante", english: "the teacher (m/f)", example_fr: "L'enseignante explique la leçon.", example_en: "The teacher explains the lesson.", category: "Professions", icon: "👨‍🏫", learned: false },
+  { id: 302, french: "le chauffeur / la chauffeuse", english: "the driver (m/f)", example_fr: "Le chauffeur conduit prudemment.", example_en: "The driver drives carefully.", category: "Professions", icon: "🚖", learned: false },
+  { id: 303, french: "le mécanicien / la mécanicienne", english: "the mechanic (m/f)", example_fr: "Le mécanicien répare la voiture.", example_en: "The mechanic repairs the car.", category: "Professions", icon: "👨‍🔧", learned: false },
+  { id: 304, french: "le facteur / la factrice", english: "the mail carrier (m/f)", example_fr: "La factrice distribue le courrier.", example_en: "The mail carrier delivers the mail.", category: "Professions", icon: "📬", learned: false },
+  { id: 305, french: "le pompier / la pompière", english: "the firefighter (m/f)", example_fr: "La pompière éteint l'incendie.", example_en: "The firefighter puts out the fire.", category: "Professions", icon: "👨‍🚒", learned: false },
+  { id: 306, french: "l'infirmier / l'infirmière", english: "the nurse (m/f)", example_fr: "L'infirmière soigne les patients.", example_en: "The nurse treats the patients.", category: "Professions", icon: "👨‍⚕️", learned: false },
+  { id: 307, french: "le docteur / la docteure", english: "the doctor (m/f)", example_fr: "La docteure examine le patient.", example_en: "The doctor examines the patient.", category: "Professions", icon: "👨‍⚕️", learned: false },
+  { id: 308, french: "le pharmacien / la pharmacienne", english: "the pharmacist (m/f)", example_fr: "Le pharmacien délivre les médicaments.", example_en: "The pharmacist dispenses the medication.", category: "Professions", icon: "⚖️", learned: false },
+  { id: 309, french: "le serveur / la serveuse", english: "the waiter / waitress", example_fr: "La serveuse apporte le menu.", example_en: "The waitress brings the menu.", category: "Professions", icon: "🤵", learned: false },
+  { id: 310, french: "le cuisinier / la cuisinière", english: "the chef / cook (m/f)", example_fr: "Le cuisinier prépare un plat délicieux.", example_en: "The chef prepares a delicious dish.", category: "Professions", icon: "👨‍🍳", learned: false },
+  { id: 311, french: "le vendeur / la vendeuse", english: "the salesperson (m/f)", example_fr: "La vendeuse aide les clients.", example_en: "The saleswoman helps the customers.", category: "Professions", icon: "👨‍💼", learned: false },
+  { id: 312, french: "l'électricien / l'électricienne", english: "the electrician (m/f)", example_fr: "L'électricien installe les câbles.", example_en: "The electrician installs the cables.", category: "Professions", icon: "⚡", learned: false },
+  { id: 313, french: "l'ingénieur / l'ingénieure", english: "the engineer (m/f)", example_fr: "L'ingénieure conçoit le projet.", example_en: "The engineer designs the project.", category: "Professions", icon: "🏗️", learned: false },
+  { id: 314, french: "le guide / la guide", english: "the tour guide (m/f)", example_fr: "Le guide explique l'histoire.", example_en: "The tour guide explains the history.", category: "Professions", icon: "🚩", learned: false },
+  { id: 315, french: "le traducteur / la traductrice", english: "the translator (m/f)", example_fr: "La traductrice parle cinq langues.", example_en: "The translator speaks five languages.", category: "Professions", icon: "🗣️", learned: false },
+  { id: 316, french: "le policier / la policière", english: "the police officer (m/f)", example_fr: "Le policier patrouille dans la rue.", example_en: "The police officer patrols the street.", category: "Professions", icon: "👮", learned: false },
   { id: 246, french: "quai", english: "platform / quay", example_fr: "Le train est au quai numéro deux.", example_en: "The train is at platform two.", category: "Nouns", icon: "🚉", learned: false },
 ];
 
@@ -203,6 +221,12 @@ export default function FrenchVocabApp() {
   const [editId, setEditId] = useState(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState("");
+  const [addMode, setAddMode] = useState("single"); // single | bulk | csv
+  const [bulkText, setBulkText] = useState("");
+  const [bulkProcessing, setBulkProcessing] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState(0);
+  const [bulkTotal, setBulkTotal] = useState(0);
+  const [bulkDone, setBulkDone] = useState(false);
 
   // ── Firebase: listen for real-time updates ──────────────────────
   useEffect(() => {
@@ -228,6 +252,77 @@ export default function FrenchVocabApp() {
     setSyncing(true);
     try { await setDoc(DOC_REF, { words: newWords }); } catch {}
     setTimeout(() => setSyncing(false), 1000);
+  };
+
+
+  const speak = (text) => {
+    if (!('speechSynthesis' in window)) return;
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(text.split('/')[0].trim());
+    u.lang = 'fr-FR';
+    u.rate = 0.7;
+    u.pitch = 1.0;
+    // Try to find a natural French voice
+    const voices = window.speechSynthesis.getVoices();
+    const frVoice = voices.find(v => v.lang.startsWith('fr') && v.localService) ||
+                    voices.find(v => v.lang.startsWith('fr'));
+    if (frVoice) u.voice = frVoice;
+    window.speechSynthesis.speak(u);
+  };
+
+  const openForvo = (text) => {
+    const word = text.split('/')[0].trim().replace(/^(le|la|les|l'|un|une)\s+/i, '').trim();
+    window.open(`https://forvo.com/search/${encodeURIComponent(word)}/fr/`, '_blank');
+  };
+
+  const bulkAutoFill = async (wordList) => {
+    setBulkProcessing(true); setBulkDone(false);
+    setBulkTotal(wordList.length); setBulkProgress(0);
+    const newWords = [];
+    for (let i = 0; i < wordList.length; i++) {
+      const french = wordList[i].trim();
+      if (!french) continue;
+      try {
+        const res = await fetch("/.netlify/functions/autofill", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ frenchWord: french })
+        });
+        const data = await res.json();
+        const text = data.content?.map(c => c.text || "").join("") || "";
+        const parsed = JSON.parse(text.replace(/```json|```/g, "").trim());
+        newWords.push({ id: Date.now() + i, french, english: parsed.english || "", example_fr: parsed.example_fr || "", example_en: parsed.example_en || "", category: parsed.category || "Other", icon: parsed.icon || "📝", learned: false });
+      } catch {
+        newWords.push({ id: Date.now() + i, french, english: "", example_fr: "", example_en: "", category: "Other", icon: "📝", learned: false });
+      }
+      setBulkProgress(i + 1);
+      await new Promise(r => setTimeout(r, 500));
+    }
+    await saveWords([...words, ...newWords]);
+    setBulkProcessing(false); setBulkDone(true); setBulkText("");
+  };
+
+  const handleBulkSubmit = () => {
+    const lines = bulkText.split('\n').map(l => l.trim()).filter(Boolean);
+    if (!lines.length) return;
+    bulkAutoFill(lines);
+  };
+
+  const handleCSV = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const lines = ev.target.result.split('\n').slice(1); // skip header
+      const parsed = lines.map(line => {
+        const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
+        if (!cols[0]) return null;
+        return { id: Date.now() + Math.random(), french: cols[0] || "", english: cols[1] || "", example_fr: cols[2] || "", example_en: cols[3] || "", category: cols[4] || "Other", icon: cols[5] || "📝", learned: false };
+      }).filter(Boolean);
+      saveWords([...words, ...parsed]);
+      setBulkDone(true);
+    };
+    reader.readAsText(file);
   };
 
   const toggleLearned = (id) => saveWords(words.map(w => w.id === id ? { ...w, learned: !w.learned } : w));
@@ -274,17 +369,11 @@ export default function FrenchVocabApp() {
     if (!form.french.trim()) return;
     setAiLoading(true); setAiError("");
     try {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
+      const res = await fetch("/.netlify/functions/autofill", {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": "YOUR_ANTHROPIC_KEY_HERE",
-          "anthropic-version": "2023-06-01",
-          "anthropic-dangerous-direct-browser-access": "true",
-        },
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          model: "claude-sonnet-4-20250514", max_tokens: 1000,
-          messages: [{ role: "user", content: `You are a French language expert helping a TEF exam student. For the French word/phrase: "${form.french.trim()}" Return ONLY valid JSON (no markdown): {"english":"English meaning","example_fr":"Natural French sentence at TEF B1/B2 level","example_en":"English translation","category":"one of: Verbs, Nouns, Adjectives, Professions, Expressions, Grammar, Other","icon":"single emoji"}` }]
+          frenchWord: form.french.trim()
         })
       });
       const data = await res.json();
@@ -383,7 +472,9 @@ export default function FrenchVocabApp() {
                       {word.icon && <span style={{ fontSize: 26 }}>{word.icon}</span>}
                       <div>
                         <span style={{ fontSize: 18, fontWeight: "bold", color: "#1a3a5c", textDecoration: word.learned ? "line-through" : "none", opacity: word.learned ? 0.7 : 1 }}>{word.french}</span>
-                        <span style={{ fontSize: 13, color: "#888", marginLeft: 8 }}>— {word.english}</span>
+                        <button onClick={(e) => { e.stopPropagation(); speak(word.french); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 16, padding: "0 4px", opacity: 0.7 }} title="Pronounce">🔊</button>
+                        <button onClick={(e) => { e.stopPropagation(); openForvo(word.french); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "0 2px", opacity: 0.6 }} title="Forvo - human pronunciation">👤</button>
+                        <span style={{ fontSize: 13, color: "#888", marginLeft: 4 }}>— {word.english}</span>
                       </div>
                     </div>
                     <div style={{ display: "flex", gap: 5, alignItems: "center", flexWrap: "wrap" }}>
@@ -429,7 +520,8 @@ export default function FrenchVocabApp() {
                       <div style={{ fontSize: 10, letterSpacing: 3, color: "#a8c5e8", textTransform: "uppercase", marginBottom: 6 }}>French</div>
                       {currentCard?.icon && <div style={{ fontSize: 46, marginBottom: 8 }}>{currentCard.icon}</div>}
                       <div style={{ fontSize: 28, fontWeight: "bold", color: "#fff" }}>{currentCard?.french}</div>
-                      <div style={{ fontSize: 11, color: "#a8c5e8", marginTop: 12 }}>👆 Tap to reveal</div>
+                      <button onClick={(e) => { e.stopPropagation(); speak(currentCard?.french); }} style={{ marginTop: 10, background: "rgba(255,255,255,0.15)", border: "none", borderRadius: 20, color: "#fff", padding: "6px 14px", cursor: "pointer", fontSize: 14 }}>🔊 Listen</button>
+                      <div style={{ fontSize: 11, color: "#a8c5e8", marginTop: 8 }}>👆 Tap to reveal</div>
                     </div>
                     <div className="cface cback" style={{ background: "linear-gradient(135deg,#c8973a,#e8b54a)", boxShadow: "0 8px 30px rgba(200,151,58,0.3)" }}>
                       <div style={{ fontSize: 10, letterSpacing: 3, color: "#5a3a00", textTransform: "uppercase", marginBottom: 6 }}>English</div>
@@ -492,8 +584,7 @@ export default function FrenchVocabApp() {
                 </div>
                 <div style={{ background: "linear-gradient(135deg,#1a3a5c,#2c5f8a)", borderRadius: 16, padding: "26px 22px", textAlign: "center", marginBottom: 16, color: "#fff" }}>
                   <div style={{ fontSize: 11, letterSpacing: 3, color: "#a8c5e8", marginBottom: 6 }}>What does this mean in English?</div>
-                  {quizWords[quizIndex].icon && <div style={{ fontSize: 46, marginBottom: 6 }}>{quizWords[quizIndex].icon}</div>}
-                  <div style={{ fontSize: 30, fontWeight: "bold" }}>{quizWords[quizIndex].french}</div>
+                    <div style={{ fontSize: 30, fontWeight: "bold" }}>{quizWords[quizIndex].french}</div>
                   {quizWords[quizIndex].example_fr && <div style={{ fontSize: 13, fontStyle: "italic", color: "#a8c5e8", marginTop: 8 }}>"{quizWords[quizIndex].example_fr}"</div>}
                 </div>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -519,6 +610,52 @@ export default function FrenchVocabApp() {
         {/* ADD WORD */}
         {tab === 3 && (
           <div>
+            {/* Mode switcher */}
+            {!editId && (
+              <div style={{ display: "flex", gap: 8, marginBottom: 14 }}>
+                {[["single","➕ Single"],["bulk","📋 Bulk List"],["csv","📂 CSV File"]].map(([m,label]) => (
+                  <button key={m} onClick={() => { setAddMode(m); setBulkDone(false); }} style={{ flex: 1, padding: "10px", border: `2px solid ${addMode===m?"#1a3a5c":"#e0d8cc"}`, background: addMode===m?"#1a3a5c":"#fff", color: addMode===m?"#fff":"#888", borderRadius: 8, fontSize: 13, fontWeight: "bold", cursor: "pointer" }}>{label}</button>
+                ))}
+              </div>
+            )}
+
+            {/* BULK LIST MODE */}
+            {addMode === "bulk" && !editId && (
+              <div style={{ background: "#fff", borderRadius: 16, padding: 22, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", marginBottom: 14 }}>
+                <h2 style={{ margin: "0 0 8px", color: "#1a3a5c", fontSize: 20 }}>📋 Bulk Add Words</h2>
+                <p style={{ fontSize: 13, color: "#888", margin: "0 0 12px" }}>Type or paste one French word per line. Auto-Fill will fill in the meaning, examples and emoji for each one automatically!</p>
+                <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} placeholder={"le soleil, la lune, la forêt..."} rows={8} style={{ width: "100%", padding: "10px 13px", border: "2px solid #e0d8cc", borderRadius: 8, fontSize: 14, fontFamily: "Georgia,serif", boxSizing: "border-box", resize: "vertical" }} />
+                {bulkProcessing && (
+                  <div style={{ marginTop: 12 }}>
+                    <div style={{ fontSize: 13, color: "#c8973a", marginBottom: 6 }}>⏳ Processing word {bulkProgress} of {bulkTotal}...</div>
+                    <div style={{ height: 6, background: "#f0ebe0", borderRadius: 4 }}>
+                      <div style={{ height: "100%", background: "#c8973a", borderRadius: 4, width: `${Math.round((bulkProgress/bulkTotal)*100)}%`, transition: "width 0.3s" }} />
+                    </div>
+                  </div>
+                )}
+                {bulkDone && <div style={{ marginTop: 10, color: "#27ae60", fontWeight: "bold", fontSize: 14 }}>✅ All words added & synced! ☁️</div>}
+                <button onClick={handleBulkSubmit} disabled={!bulkText.trim() || bulkProcessing} style={{ marginTop: 14, width: "100%", padding: "13px", background: bulkText.trim() && !bulkProcessing ? "#1a3a5c" : "#ccc", color: "#fff", border: "none", borderRadius: 10, fontSize: 15, fontWeight: "bold", cursor: bulkText.trim() && !bulkProcessing ? "pointer" : "default" }}>
+                  {bulkProcessing ? `⏳ Auto-Filling ${bulkProgress}/${bulkTotal}...` : "✨ Auto-Fill All & Add"}
+                </button>
+              </div>
+            )}
+
+            {/* CSV MODE */}
+            {addMode === "csv" && !editId && (
+              <div style={{ background: "#fff", borderRadius: 16, padding: 22, boxShadow: "0 2px 12px rgba(0,0,0,0.08)", marginBottom: 14 }}>
+                <h2 style={{ margin: "0 0 8px", color: "#1a3a5c", fontSize: 20 }}>📂 Import CSV File</h2>
+                <p style={{ fontSize: 13, color: "#888", margin: "0 0 8px" }}>Upload a CSV with columns: <strong>french, english, example_fr, example_en, category, icon</strong></p>
+                <div style={{ background: "#f5f0e8", borderRadius: 8, padding: "10px 14px", fontSize: 12, color: "#7a5a00", marginBottom: 14, fontFamily: "monospace" }}>
+                  french,english,example_fr,example_en,category,icon<br/>
+                  le soleil,the sun,Le soleil brille.,The sun shines.,Nouns,☀️
+                </div>
+                <input type="file" accept=".csv" onChange={handleCSV} style={{ width: "100%", padding: "10px", border: "2px solid #e0d8cc", borderRadius: 8, fontSize: 14, cursor: "pointer" }} />
+                {bulkDone && <div style={{ marginTop: 10, color: "#27ae60", fontWeight: "bold", fontSize: 14 }}>✅ CSV imported & synced! ☁️</div>}
+              </div>
+            )}
+
+            {/* SINGLE WORD MODE */}
+            {(addMode === "single" || editId) && (
             <div style={{ background: "#fff", borderRadius: 16, padding: 22, boxShadow: "0 2px 12px rgba(0,0,0,0.08)" }}>
               <h2 style={{ margin: "0 0 16px", color: "#1a3a5c", fontSize: 20 }}>{editId ? "✏️ Edit Word" : "➕ Add New Word"}</h2>
               <div style={{ marginBottom: 14 }}>
@@ -561,6 +698,7 @@ export default function FrenchVocabApp() {
               {editId && <button onClick={() => { setEditId(null); setForm({ french: "", english: "", example_fr: "", example_en: "", category: "Other", icon: "" }); }} style={{ width: "100%", padding: "10px", marginTop: 8, background: "transparent", color: "#888", border: "2px solid #e0d8cc", borderRadius: 10, fontSize: 14, cursor: "pointer" }}>Cancel</button>}
               {addSuccess && <div style={{ marginTop: 13, textAlign: "center", color: "#27ae60", fontWeight: "bold", fontSize: 15 }}>✅ Word saved & synced to all devices! ☁️</div>}
             </div>
+            )}
             <div style={{ marginTop: 14, background: "#fffbf0", border: "1px solid #e8d8a0", borderRadius: 10, padding: "11px 15px", fontSize: 13, color: "#7a5a00" }}>
               ☁️ <strong>Firebase sync is active.</strong> Any word you add here will instantly appear on your phone and all other devices!
             </div>
