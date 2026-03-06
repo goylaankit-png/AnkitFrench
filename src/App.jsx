@@ -255,19 +255,30 @@ export default function FrenchVocabApp() {
   };
 
 
-  const speak = (text) => {
+  const speak = (text, rate = 0.65) => {
     if (!('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(text.split('/')[0].trim());
-    u.lang = 'fr-FR';
-    u.rate = 0.7;
-    u.pitch = 1.0;
-    // Try to find a natural French voice
-    const voices = window.speechSynthesis.getVoices();
-    const frVoice = voices.find(v => v.lang.startsWith('fr') && v.localService) ||
-                    voices.find(v => v.lang.startsWith('fr'));
-    if (frVoice) u.voice = frVoice;
-    window.speechSynthesis.speak(u);
+    const clean = text.split('/')[0].trim();
+    const doSpeak = () => {
+      const u = new SpeechSynthesisUtterance(clean);
+      u.lang = 'fr-FR';
+      u.rate = rate;
+      u.pitch = 1.05;
+      const voices = window.speechSynthesis.getVoices();
+      // Priority: French local voices, prefer Thomas, Amelie, Google French
+      const frVoice = 
+        voices.find(v => v.lang === 'fr-FR' && /thomas|amelie|marie/i.test(v.name)) ||
+        voices.find(v => v.lang === 'fr-FR' && v.localService) ||
+        voices.find(v => v.lang === 'fr-CA' && v.localService) ||
+        voices.find(v => v.lang.startsWith('fr') && /google/i.test(v.name)) ||
+        voices.find(v => v.lang.startsWith('fr'));
+      if (frVoice) u.voice = frVoice;
+      window.speechSynthesis.speak(u);
+    };
+    // Voices may not be loaded yet
+    if (window.speechSynthesis.getVoices().length === 0) {
+      window.speechSynthesis.onvoiceschanged = doSpeak;
+    } else { doSpeak(); }
   };
 
   const openForvo = (text) => {
@@ -348,6 +359,7 @@ export default function FrenchVocabApp() {
     const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, Math.min(10, pool.length));
     setQuizWords(shuffled); setQuizIndex(0); setScore(0); setSelected(null); setQuizDone(false);
     genOpts(shuffled, 0, pool);
+    setTimeout(() => speak(shuffled[0].french), 400);
   };
   const genOpts = (qw, idx, pool) => {
     const correct = qw[idx];
@@ -360,8 +372,10 @@ export default function FrenchVocabApp() {
     if (opt.id === quizWords[quizIndex].id) setScore(s => s + 1);
     setTimeout(() => {
       if (quizIndex + 1 >= quizWords.length) { setQuizDone(true); return; }
-      setQuizIndex(i => i + 1); setSelected(null);
-      genOpts(quizWords, quizIndex + 1, getQuizPool());
+      const nextIdx = quizIndex + 1;
+      setQuizIndex(nextIdx); setSelected(null);
+      genOpts(quizWords, nextIdx, getQuizPool());
+      setTimeout(() => speak(quizWords[nextIdx].french), 400);
     }, 1000);
   };
 
@@ -674,6 +688,11 @@ export default function FrenchVocabApp() {
                 <div style={{ flex: 1 }}>
                   <label style={{ display: "block", fontSize: 13, fontWeight: "bold", color: "#555", marginBottom: 4 }}>Icon / Emoji</label>
                   <input value={form.icon} onChange={e => setForm(f => ({ ...f, icon: e.target.value }))} placeholder="Auto-filled, or type your own 🌲" style={{ width: "100%", padding: "10px 13px", border: "2px solid #e0d8cc", borderRadius: 8, fontSize: 18, fontFamily: "Georgia,serif", boxSizing: "border-box", outline: "none" }} />
+                  <div style={{ marginTop: 8, display: "flex", flexWrap: "wrap", gap: 4 }}>
+                    {["🏠","🚗","🍎","📚","💼","🏥","🌍","💰","❤️","🎵","🌿","🍽️","🚆","✈️","🏖️","🎓","👨‍👩‍👧","🛒","☀️","🌧️","🐶","🐱","🌸","⚽","🎨","💻","📱","🔑","🧳","🪴","🍷","☕","🥐","🧀","🥩","🎭","🏔️","🌊","🎪","🧠","💪","👁️","🦷","💊","🚑","👮","👷","👩‍🍳","👨‍🏫","🔧","⚡","📬","🚒","🗣️","🏗️","🚩","🤵","💍","👶","🎁","🛋️","🛏️","🚪","🪞","💡","🧹","🌡️","📅","⏰","💶","🆓","🎉","✅","❓","🔁","➡️","🎨","🤝","🙏","😊","😬","🚉","🛣️","🌅","🏘️","🪑","📖"].map(e => (
+                      <button key={e} onClick={() => setForm(f => ({ ...f, icon: e }))} style={{ background: form.icon === e ? "#1a3a5c" : "#f5f0e8", border: form.icon === e ? "2px solid #1a3a5c" : "2px solid transparent", borderRadius: 6, fontSize: 20, padding: "4px 6px", cursor: "pointer", lineHeight: 1 }}>{e}</button>
+                    ))}
+                  </div>
                 </div>
               </div>
               {[
